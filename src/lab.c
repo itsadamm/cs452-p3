@@ -2,6 +2,89 @@
 #include <sys/time.h> /* for gettimeofday system call */
 #include "lab.h"
 
+
+// Struct to hold information for each thread's chunk
+typedef struct {
+    int *array;
+    int start;
+    int end;
+} ThreadData;
+
+// Forward declarations of helper functions
+void *threaded_merge_sort(void *arg);
+void merge_sections(int *array, int start1, int end1, int start2, int end2);
+
+// Multi-threaded merge sort function
+void mergesort_mt(int *A, int n, int num_threads) {
+    int chunk_size = n / num_threads;
+    pthread_t threads[num_threads];
+    ThreadData thread_data[num_threads];
+
+    // Create threads for each chunk
+    for (int i = 0; i < num_threads; i++) {
+        thread_data[i].array = A;
+        thread_data[i].start = i * chunk_size;
+        thread_data[i].end = (i == num_threads - 1) ? n - 1 : thread_data[i].start + chunk_size - 1;
+
+        pthread_create(&threads[i], NULL, threaded_merge_sort, &thread_data[i]);
+    }
+
+    // Wait for all threads to finish
+    for (int i = 0; i < num_threads; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    // Merge sorted sections two at a time
+    int current_chunk_size = chunk_size;
+    while (current_chunk_size < n) {
+        for (int i = 0; i < n; i += 2 * current_chunk_size) {
+            int mid = i + current_chunk_size - 1;
+            int end = (i + 2 * current_chunk_size - 1 < n - 1) ? i + 2 * current_chunk_size - 1 : n - 1;
+            if (mid < end) {
+                merge_sections(A, i, mid, mid + 1, end);
+            }
+        }
+        current_chunk_size *= 2;
+    }
+}
+
+// Helper function: Sorting function for each thread
+void *threaded_merge_sort(void *arg) {
+    ThreadData *data = (ThreadData *)arg;
+    mergesort_s(data->array, data->start, data->end);  // Updated to use mergesort_s
+    return NULL;
+}
+
+// Helper function: Merging two sections of the array
+void merge_sections(int *array, int start1, int end1, int start2, int end2) {
+    int size = end2 - start1 + 1;
+    int *temp = (int *)malloc(size * sizeof(int));
+    int i = start1, j = start2, k = 0;
+
+    while (i <= end1 && j <= end2) {
+        if (array[i] <= array[j]) {
+            temp[k++] = array[i++];
+        } else {
+            temp[k++] = array[j++];
+        }
+    }
+    while (i <= end1) temp[k++] = array[i++];
+    while (j <= end2) temp[k++] = array[j++];
+
+    for (i = 0; i < size; i++) {
+        array[start1 + i] = temp[i];
+    }
+
+    free(temp);
+}
+
+
+
+
+
+
+
+
 /**
  * @brief Standard insertion sort that is faster than merge sort for small array's
  *
